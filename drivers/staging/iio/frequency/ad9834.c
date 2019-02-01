@@ -6,7 +6,6 @@
  * Licensed under the GPL-2.
  */
 
-#include <linux/clk.h>
 #include <linux/interrupt.h>
 #include <linux/workqueue.h>
 #include <linux/device.h>
@@ -72,7 +71,7 @@
 struct ad9834_state {
 	struct spi_device		*spi;
 	struct regulator		*reg;
-	struct clk			*mclk;
+	unsigned long				mclk;
 	unsigned short			control;
 	unsigned short			devid;
 	struct spi_transfer		xfer;
@@ -114,7 +113,7 @@ static int ad9834_write_frequency(struct ad9834_state *st,
 	unsigned long clk_freq;
 	unsigned long regval;
 
-	clk_freq = clk_get_rate(st->mclk);
+	clk_freq = st->mclk;
 
 	if (!clk_freq || fout > (clk_freq / 2))
 		return -EINVAL;
@@ -419,14 +418,7 @@ static int ad9834_probe(struct spi_device *spi)
 	spi_set_drvdata(spi, indio_dev);
 	st = iio_priv(indio_dev);
 	mutex_init(&st->lock);
-	st->mclk = devm_clk_get(&spi->dev, NULL);
-
-	ret = clk_prepare_enable(st->mclk);
-	if (ret) {
-		dev_err(&spi->dev, "Failed to enable master clock\n");
-		goto error_disable_reg;
-	}
-
+	st->mclk = 25000000;
 	st->spi = spi;
 	st->devid = spi_get_device_id(spi)->driver_data;
 	st->reg = reg;
@@ -496,7 +488,6 @@ static int ad9834_probe(struct spi_device *spi)
 
 	return 0;
 error_clock_unprepare:
-	clk_disable_unprepare(st->mclk);
 error_disable_reg:
 	regulator_disable(reg);
 
@@ -509,7 +500,6 @@ static int ad9834_remove(struct spi_device *spi)
 	struct ad9834_state *st = iio_priv(indio_dev);
 
 	iio_device_unregister(indio_dev);
-	clk_disable_unprepare(st->mclk);
 	regulator_disable(st->reg);
 
 	return 0;

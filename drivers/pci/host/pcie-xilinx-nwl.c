@@ -391,7 +391,7 @@ static void nwl_mask_leg_irq(struct irq_data *data)
 	u32 mask;
 	u32 val;
 
-	mask = 1 << data->hwirq;
+	mask = 1 << (data->hwirq - 1);
 	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
 	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
 	nwl_bridge_writel(pcie, (val & (~mask)), MSGF_LEG_MASK);
@@ -405,11 +405,11 @@ static void nwl_unmask_leg_irq(struct irq_data *data)
 	u32 mask;
 	u32 val;
 
-	mask = 1 << data->hwirq;
-	raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
-	val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
-	nwl_bridge_writel(pcie, (val | mask), MSGF_LEG_MASK);
-	raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
+        mask = 1 << (data->hwirq - 1);
+        raw_spin_lock_irqsave(&pcie->leg_mask_lock, flags);
+        val = nwl_bridge_readl(pcie, MSGF_LEG_MASK);
+        nwl_bridge_writel(pcie, (val | mask), MSGF_LEG_MASK);
+        raw_spin_unlock_irqrestore(&pcie->leg_mask_lock, flags);
 }
 
 static struct irq_chip nwl_leg_irq_chip = {
@@ -428,7 +428,6 @@ static int nwl_legacy_map(struct irq_domain *domain, unsigned int irq,
 	irq_set_status_flags(irq, IRQ_LEVEL);
 
 	return 0;
-}
 
 static const struct irq_domain_ops legacy_domain_ops = {
 	.map = nwl_legacy_map,
@@ -460,13 +459,11 @@ static void nwl_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 	msg->address_lo = lower_32_bits(msi_addr);
 	msg->address_hi = upper_32_bits(msi_addr);
 	msg->data = data->hwirq;
-}
 
 static int nwl_msi_set_affinity(struct irq_data *irq_data,
 				const struct cpumask *mask, bool force)
 {
 	return -EINVAL;
-}
 
 static struct irq_chip nwl_irq_chip = {
 	.name = "Xilinx MSI",
@@ -497,7 +494,6 @@ static int nwl_irq_domain_alloc(struct irq_domain *domain, unsigned int virq,
 	}
 	mutex_unlock(&msi->lock);
 	return 0;
-}
 
 static void nwl_irq_domain_free(struct irq_domain *domain, unsigned int virq,
 					unsigned int nr_irqs)
@@ -510,7 +506,6 @@ static void nwl_irq_domain_free(struct irq_domain *domain, unsigned int virq,
 	bitmap_release_region(msi->bitmap, data->hwirq,
 			      get_count_order(nr_irqs));
 	mutex_unlock(&msi->lock);
-}
 
 static const struct irq_domain_ops dev_msi_domain_ops = {
 	.alloc  = nwl_irq_domain_alloc,
@@ -540,7 +535,6 @@ static int nwl_pcie_init_msi_irq_domain(struct nwl_pcie *pcie)
 	}
 #endif
 	return 0;
-}
 
 static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
 {
@@ -567,7 +561,6 @@ static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
 	raw_spin_lock_init(&pcie->leg_mask_lock);
 	nwl_pcie_init_msi_irq_domain(pcie);
 	return 0;
-}
 
 static int nwl_pcie_enable_msi(struct nwl_pcie *pcie)
 {
@@ -654,7 +647,6 @@ err:
 	kfree(msi->bitmap);
 	msi->bitmap = NULL;
 	return ret;
-}
 
 static int nwl_pcie_bridge_init(struct nwl_pcie *pcie)
 {
@@ -663,7 +655,6 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *pcie)
 	u32 breg_val, ecam_val, first_busno = 0;
 	int err;
 
-	breg_val = nwl_bridge_readl(pcie, E_BREG_CAPABILITIES) & BREG_PRESENT;
 	if (!breg_val) {
 		dev_err(dev, "BREG is not present\n");
 		return breg_val;
@@ -694,7 +685,6 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *pcie)
 	if (err)
 		return err;
 
-	ecam_val = nwl_bridge_readl(pcie, E_ECAM_CAPABILITIES) & E_ECAM_PRESENT;
 	if (!ecam_val) {
 		dev_err(dev, "ECAM is not present\n");
 		return ecam_val;
@@ -714,7 +704,6 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *pcie)
 			  E_ECAM_BASE_HI);
 
 	/* Get bus range */
-	ecam_val = nwl_bridge_readl(pcie, E_ECAM_CONTROL);
 	pcie->last_busno = (ecam_val & E_ECAM_SIZE_LOC) >> E_ECAM_SIZE_SHIFT;
 	/* Write primary, secondary and subordinate bus numbers */
 	ecam_val = first_busno;
@@ -770,7 +759,6 @@ static int nwl_pcie_bridge_init(struct nwl_pcie *pcie)
 			  BRCFG_INTERRUPT_MASK, BRCFG_INTERRUPT);
 
 	return 0;
-}
 
 static int nwl_pcie_parse_dt(struct nwl_pcie *pcie,
 			     struct platform_device *pdev)
@@ -816,7 +804,6 @@ static int nwl_pcie_parse_dt(struct nwl_pcie *pcie,
 					 nwl_pcie_leg_handler, pcie);
 
 	return 0;
-}
 
 static const struct of_device_id nwl_pcie_of_match[] = {
 	{ .compatible = "xlnx,nwl-pcie-2.11", },
@@ -913,7 +900,6 @@ static int nwl_pcie_probe(struct platform_device *pdev)
 error:
 	pci_free_resource_list(&res);
 	return err;
-}
 
 static struct platform_driver nwl_pcie_driver = {
 	.driver = {

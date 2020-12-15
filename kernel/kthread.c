@@ -683,7 +683,8 @@ repeat:
 		 * event only cares about the address.
 		 */
 		trace_sched_kthread_work_execute_end(work, func);
-	} else if (!freezing(current)) {
+	} else if (!freezing(current))
+	} else if (!freezing(current))
 		schedule();
 	} else {
 		/*

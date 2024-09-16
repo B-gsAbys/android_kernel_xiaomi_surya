@@ -616,7 +616,7 @@ static struct qrtr_node *qrtr_node_lookup(unsigned int nid)
 	down_read(&qrtr_node_lock);
 	node = radix_tree_lookup(&qrtr_nodes, nid);
 	node = qrtr_node_acquire(node);
-	up_read(&qrtr_node_lock);
+	mutex_unlock(&qrtr_node_lock);
 
 	return node;
 }
@@ -638,7 +638,7 @@ static void qrtr_node_assign(struct qrtr_node *node, unsigned int nid)
 
 	down_read(&qrtr_node_lock);
 	tnode = radix_tree_lookup(&qrtr_nodes, nid);
-	up_read(&qrtr_node_lock);
+	mutex_unlock(&qrtr_node_lock);
 	if (tnode)
 		return;
 
@@ -960,7 +960,7 @@ static void qrtr_fwd_ctrl_pkt(struct sk_buff *skb)
 
 		qrtr_node_enqueue(node, skbn, cb->type, &from, &to, 0);
 	}
-	up_read(&qrtr_node_lock);
+	mutex_unlock(&qrtr_node_lock);
 	qrtr_node_release(src);
 }
 
@@ -1243,7 +1243,7 @@ void qrtr_endpoint_unregister(struct qrtr_endpoint *ep)
 
 		qrtr_fwd_del_proc(node, iter.index);
 	}
-	up_read(&qrtr_node_lock);
+	mutex_unlock(&qrtr_node_lock);
 
 	/* Wake up any transmitters waiting for resume-tx from the node */
 	wake_up_interruptible_all(&node->resume_tx);
@@ -1540,17 +1540,15 @@ static int qrtr_bcast_enqueue(struct qrtr_node *node, struct sk_buff *skb,
 {
 	struct sk_buff *skbn;
 
-	down_read(&qrtr_node_lock);
-	list_for_each_entry(node, &qrtr_all_epts, item) {
-		if (node->nid == QRTR_EP_NID_AUTO && type != QRTR_TYPE_HELLO)
-			continue;
+	mutex_lock(&qrtr_node_lock);
+	list_for_each_entry(node, &qrtr_all_nodes, item) {
 		skbn = pskb_copy(skb, GFP_KERNEL);
 		if (!skbn)
 			break;
 		skb_set_owner_w(skbn, skb->sk);
 		qrtr_node_enqueue(node, skbn, type, from, to, flags);
 	}
-	up_read(&qrtr_node_lock);
+	mutex_unlock(&qrtr_node_lock);
 
 	qrtr_local_enqueue(NULL, skb, type, from, to, flags);
 
